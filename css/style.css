@@ -403,6 +403,73 @@ main {
   min-height: 1.3em;
 }
 
+.notation-legend {
+  background: var(--page-bg);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-top: 10px;
+}
+
+.notation-legend summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--forest);
+}
+
+.notation-legend-body {
+  margin-top: 8px;
+}
+
+.notation-legend-body h5 {
+  margin: 10px 0 4px 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #777;
+}
+
+.notation-legend-body h5:first-child {
+  margin-top: 0;
+}
+
+.notation-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.notation-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 0.88rem;
+}
+
+.notation-abbr {
+  font-family: "Courier New", monospace;
+  font-weight: 700;
+  background: var(--panel-bg);
+  border-radius: 5px;
+  padding: 1px 7px;
+  min-width: 34px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.notation-name {
+  color: var(--text);
+}
+
+.notation-hint {
+  margin: 8px 0 0 0;
+  font-size: 0.8rem;
+  color: #777;
+}
+
 .move-history {
   max-height: 160px;
   overflow-y: auto;

@@ -3,6 +3,7 @@ import { ChessBoard } from "./board.js";
 import { getLegalTargets, gameOutcome, outcomeText } from "./chess-utils.js";
 import { Engine, DIFFICULTIES } from "./engine.js";
 import { analyzeGame, renderReview } from "./review.js";
+import { mountNotationLegend } from "./notation-legend.js";
 
 export function mountSparring(root) {
   root.innerHTML = `
@@ -24,6 +25,7 @@ export function mountSparring(root) {
       <div class="sparring-board-slot"></div>
       <div class="sparring-panel">
         <p class="sparring-status"></p>
+        <div class="notation-legend-slot"></div>
         <div class="move-history"></div>
         <div class="sparring-actions">
           <button class="btn undo-move">Zug zurücknehmen</button>
@@ -47,6 +49,9 @@ export function mountSparring(root) {
   const backBtn = root.querySelector(".back-to-setup");
   const reviewBtn = root.querySelector(".review-game");
   const reviewPanel = root.querySelector(".review-panel");
+  const notationLegendSlot = root.querySelector(".notation-legend-slot");
+
+  mountNotationLegend(notationLegendSlot);
 
   let selectedDifficulty = DIFFICULTIES[1];
   let selectedColor = "white";
