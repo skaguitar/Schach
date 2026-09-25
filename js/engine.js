@@ -111,6 +111,32 @@ export class Engine {
     return { lines };
   }
 
+  // Bewertet gezielt eine begrenzte Liste von Zügen (UCI-Notation, z. B.
+  // "e2e4") über "go ... searchmoves", statt die ganze Stellung zu
+  // durchsuchen. So lassen sich z. B. alle Zugoptionen einer einzelnen
+  // Figur mit vertretbarem Aufwand einzeln bewerten.
+  async analyzeMoves(fen, uciMoves, movetimeMs) {
+    if (!uciMoves.length) return { lines: [] };
+    this.setMultiPv(uciMoves.length);
+    this._multiPvInfo = {};
+    this.worker.postMessage(`position fen ${fen}`);
+    const resultPromise = this._waitFor((line) => line.startsWith("bestmove"));
+    this.worker.postMessage(`go movetime ${movetimeMs} searchmoves ${uciMoves.join(" ")}`);
+    await resultPromise;
+    const lines = Object.keys(this._multiPvInfo)
+      .map((key) => parseInt(key, 10))
+      .sort((a, b) => a - b)
+      .map((idx) => this._multiPvInfo[idx]);
+    return { lines };
+  }
+
+  // Liefert nur den besten Zug samt Bewertung der Gesamtstellung (MultiPV 1).
+  async analyzeBest(fen, movetimeMs) {
+    this.setMultiPv(1);
+    const { lines } = await this.analyzeMultiPv(fen, movetimeMs);
+    return lines[0] || null;
+  }
+
   terminate() {
     if (this.worker) this.worker.terminate();
     this.worker = null;

@@ -1,4 +1,4 @@
-const CACHE_NAME = "schach-lernen-v6";
+const CACHE_NAME = "schach-lernen-v7";
 const PRECACHE_URLS = [
   "index.html",
   "manifest.json",
@@ -7,10 +7,13 @@ const PRECACHE_URLS = [
   "js/board.js",
   "js/chess-utils.js",
   "js/engine.js",
+  "js/eval-utils.js",
+  "js/coaching-text.js",
   "js/lessons.js",
   "js/lessons-data.js",
   "js/sparring.js",
   "js/review.js",
+  "js/coach.js",
   "js/notation-legend.js",
   "vendor/chess.esm.js",
   "vendor/stockfish.js",

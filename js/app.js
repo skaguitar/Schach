@@ -1,11 +1,13 @@
 import { mountLessons } from "./lessons.js";
 import { mountSparring } from "./sparring.js";
+import { mountCoach } from "./coach.js";
 
 const tabButtons = document.querySelectorAll(".tab-btn");
 const tabViews = {
   home: document.getElementById("tab-home"),
   lessons: document.getElementById("tab-lessons"),
   sparring: document.getElementById("tab-sparring"),
+  coach: document.getElementById("tab-coach"),
 };
 
 function activateTab(name) {
@@ -19,9 +21,11 @@ tabButtons.forEach((btn) => {
 
 document.querySelector(".go-lessons").addEventListener("click", () => activateTab("lessons"));
 document.querySelector(".go-sparring").addEventListener("click", () => activateTab("sparring"));
+document.querySelector(".go-coach").addEventListener("click", () => activateTab("coach"));
 
 mountLessons(tabViews.lessons);
 mountSparring(tabViews.sparring);
+mountCoach(tabViews.coach);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

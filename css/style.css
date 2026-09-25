@@ -216,6 +216,27 @@ main {
   fill: rgba(31, 120, 180, 0.35);
 }
 
+/* Zugqualität im Coach-Modus */
+.highlight.quality-best {
+  fill: rgba(45, 165, 90, 0.65);
+}
+
+.highlight.quality-good {
+  fill: rgba(140, 198, 120, 0.6);
+}
+
+.highlight.quality-inaccuracy {
+  fill: rgba(198, 138, 63, 0.55);
+}
+
+.highlight.quality-mistake {
+  fill: rgba(201, 104, 47, 0.6);
+}
+
+.highlight.quality-blunder {
+  fill: rgba(179, 67, 43, 0.65);
+}
+
 .promotion-picker {
   position: absolute;
   display: flex;
@@ -665,6 +686,65 @@ main {
 h4.review-move-list-heading {
   margin: 4px 0 0 0;
   color: var(--forest);
+}
+
+/* --- Coach --- */
+
+.coach-intro {
+  background: var(--panel-bg);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.coach-intro p {
+  margin: 0 0 10px 0;
+}
+
+.coach-quality-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.coach-panel {
+  background: var(--panel-bg);
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.coach-status {
+  font-weight: 600;
+  min-height: 1.3em;
+  margin: 0 0 12px 0;
+}
+
+.coach-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.coach-tooltip {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  max-width: 220px;
+  background: var(--forest-dark);
+  color: var(--cream);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  padding: 8px 12px;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  z-index: 6;
+  pointer-events: none;
+}
+
+.coach-tooltip.below {
+  transform: translate(-50%, 0);
 }
 
 @media (min-width: 700px) {

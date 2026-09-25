@@ -11,6 +11,8 @@ const SQUARE = 60;
 const BOARD_PX = SQUARE * 8;
 const SVG_NS = "http://www.w3.org/2000/svg";
 const PROMOTION_PIECES = ["q", "r", "b", "n"];
+const LONG_PRESS_MS = 500;
+const LONG_PRESS_MOVE_TOLERANCE = 10;
 
 function fileRankToSquare(file, rank) {
   return FILES[file] + (rank + 1);
@@ -60,11 +62,16 @@ export class ChessBoard {
     this.showCoordinates = options.showCoordinates !== false;
     this.onMove = options.onMove || null;
     this.legalMovesProvider = options.legalMovesProvider || null;
+    this.onLongPress = options.onLongPress || null;
     this.pieces = {};
     this.selected = null;
     this.legalTargets = [];
     this.extraHighlights = new Map();
     this.lastMove = null;
+    this._selectionToken = 0;
+    this._pressTimer = null;
+    this._pressStart = null;
+    this._longPressFired = false;
 
     this._buildDom();
   }
@@ -96,7 +103,11 @@ export class ChessBoard {
     this.promoBox.className = "promotion-picker hidden";
     this.wrapper.appendChild(this.promoBox);
 
-    this.svg.addEventListener("click", (e) => this._handleClick(e));
+    this.svg.addEventListener("pointerdown", (e) => this._handlePointerDown(e));
+    this.svg.addEventListener("pointerup", (e) => this._handlePointerUp(e));
+    this.svg.addEventListener("pointermove", (e) => this._handlePointerMove(e));
+    this.svg.addEventListener("pointercancel", () => this._clearPressTimer());
+    this.svg.addEventListener("pointerleave", () => this._clearPressTimer());
   }
 
   _drawSquares() {
@@ -201,9 +212,25 @@ export class ChessBoard {
     if (this.selected) {
       draw(this.selected, "highlight selected");
       for (const target of this.legalTargets) {
-        draw(target.to, target.captured ? "highlight capture-target" : "highlight move-target");
+        draw(target.to, target.className || (target.captured ? "highlight capture-target" : "highlight move-target"));
       }
     }
+  }
+
+  // Pixel-Rechteck eines Feldes relativ zum wrapper-Element, z. B. um dort
+  // ein HTML-Overlay (Tooltip, Popup) exakt zu positionieren.
+  getSquareScreenRect(square) {
+    const { x, y } = squareToCoords(square, this.orientation);
+    const rect = this.svg.getBoundingClientRect();
+    const wrapperRect = this.wrapper.getBoundingClientRect();
+    const scaleX = rect.width / BOARD_PX;
+    const scaleY = rect.height / BOARD_PX;
+    return {
+      left: rect.left - wrapperRect.left + x * scaleX,
+      top: rect.top - wrapperRect.top + y * scaleY,
+      width: SQUARE * scaleX,
+      height: SQUARE * scaleY,
+    };
   }
 
   highlightSquares(squares, className) {
@@ -221,15 +248,56 @@ export class ChessBoard {
   _clearSelection() {
     this.selected = null;
     this.legalTargets = [];
+    this._selectionToken++;
   }
 
-  _handleClick(evt) {
-    if (!this.interactive) return;
+  _eventToSquare(evt) {
     const rect = this.svg.getBoundingClientRect();
     const scale = BOARD_PX / rect.width;
     const x = (evt.clientX - rect.left) * scale;
     const y = (evt.clientY - rect.top) * scale;
-    const square = coordsToSquare(x, y, this.orientation);
+    return coordsToSquare(x, y, this.orientation);
+  }
+
+  _handlePointerDown(evt) {
+    if (!this.interactive) return;
+    this._longPressFired = false;
+    this._pressStart = { x: evt.clientX, y: evt.clientY };
+    this._clearPressTimer();
+    this._pressTimer = setTimeout(() => {
+      this._longPressFired = true;
+      this._pressTimer = null;
+      const square = this._eventToSquare(evt);
+      if (square && this.onLongPress) this.onLongPress(square);
+    }, LONG_PRESS_MS);
+  }
+
+  _handlePointerMove(evt) {
+    if (!this._pressStart) return;
+    const dx = evt.clientX - this._pressStart.x;
+    const dy = evt.clientY - this._pressStart.y;
+    if (Math.hypot(dx, dy) > LONG_PRESS_MOVE_TOLERANCE) this._clearPressTimer();
+  }
+
+  _handlePointerUp(evt) {
+    const wasLongPress = this._longPressFired;
+    this._clearPressTimer();
+    this._pressStart = null;
+    this._longPressFired = false;
+    if (wasLongPress) return;
+    this._handleTap(evt);
+  }
+
+  _clearPressTimer() {
+    if (this._pressTimer) {
+      clearTimeout(this._pressTimer);
+      this._pressTimer = null;
+    }
+  }
+
+  _handleTap(evt) {
+    if (!this.interactive) return;
+    const square = this._eventToSquare(evt);
     if (!square) return;
 
     if (this.selected) {
@@ -247,7 +315,31 @@ export class ChessBoard {
       return;
     }
     if (!this.legalMovesProvider) return;
-    const moves = this.legalMovesProvider(square) || [];
+
+    const token = ++this._selectionToken;
+    const result = this.legalMovesProvider(square);
+
+    if (result && typeof result.then === "function") {
+      // Asynchroner Provider (z. B. Live-Engine-Bewertung im Coach-Modus):
+      // Auswahlmarkierung sofort zeigen, Zielfelder folgen, sobald die
+      // Bewertung da ist. Veraltete Antworten (Auswahl hat sich inzwischen
+      // geändert) werden verworfen.
+      this.selected = square;
+      this.legalTargets = [];
+      this._renderHighlights();
+      result.then((moves) => {
+        if (token !== this._selectionToken) return;
+        if (!moves || moves.length === 0) {
+          this._clearSelection();
+        } else {
+          this.legalTargets = moves;
+        }
+        this._renderHighlights();
+      });
+      return;
+    }
+
+    const moves = result || [];
     if (moves.length === 0) {
       this._clearSelection();
       this._renderHighlights();
