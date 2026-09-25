@@ -1,10 +1,11 @@
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
-// ︎ (text presentation selector) erzwingt die stylebare Outline-Glyphe
-// statt der farbigen Emoji-Variante, die manche Mobil-Browser sonst statt
-// unserer fill/stroke-Farben anzeigen.
+// Die "weißen" Unicode-Schachsymbole (♔♕♖...) sind in so gut wie jeder
+// Schriftart nur eine dünne Kontur ohne füllbare Fläche im Innern – daher
+// nutzen wir für beide Farben dieselben massiven ("schwarzen") Symbole und
+// unterscheiden Weiß/Schwarz ausschließlich über fill/stroke in der CSS.
 const PIECE_GLYPHS = {
-  K: "♔︎", Q: "♕︎", R: "♖︎", B: "♗︎", N: "♘︎", P: "♙︎",
-  k: "♚︎", q: "♛︎", r: "♜︎", b: "♝︎", n: "♞︎", p: "♟︎",
+  K: "♚", Q: "♛", R: "♜", B: "♝", N: "♞", P: "♟",
+  k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟",
 };
 const SQUARE = 60;
 const BOARD_PX = SQUARE * 8;
