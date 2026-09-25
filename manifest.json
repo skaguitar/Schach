@@ -1,0 +1,17 @@
+{
+  "name": "Schach Lernen",
+  "short_name": "Schach Lernen",
+  "description": "Schach lernen mit interaktiven Lektionen und Sparring gegen eine Engine.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1f4d3d",
+  "theme_color": "#1f4d3d",
+  "lang": "de",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

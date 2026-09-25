@@ -1,0 +1,14 @@
+{
+  "name": "schach-lernen",
+  "version": "1.0.0",
+  "description": "PWA zum Schachlernen: Lektionen und Sparring gegen Stockfish. Statische Seite, kein Build-Schritt. chess.js/stockfish liegen als fertige Dateien in vendor/; die npm-Abhängigkeiten hier dienen nur dazu, sie bei Bedarf neu zu beziehen bzw. die Icons neu zu erzeugen (sharp).",
+  "private": true,
+  "license": "ISC",
+  "dependencies": {
+    "chess.js": "^1.4.0",
+    "stockfish": "^19.0.0"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.4"
+  }
+}
