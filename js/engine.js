@@ -12,9 +12,25 @@ export class Engine {
     this.worker = null;
     this.ready = false;
     this._lineWaiters = [];
+    this._multiPvInfo = {};
   }
 
   _onLine(line) {
+    if (line.startsWith("info ") && line.includes(" pv ")) {
+      const multipvMatch = line.match(/ multipv (\d+)/);
+      const idx = multipvMatch ? parseInt(multipvMatch[1], 10) : 1;
+      const mateMatch = line.match(/ score mate (-?\d+)/);
+      const cpMatch = line.match(/ score cp (-?\d+)/);
+      const pvMatch = line.match(/ pv (.+)$/);
+      if (pvMatch && (mateMatch || cpMatch)) {
+        this._multiPvInfo[idx] = {
+          uciMove: pvMatch[1].split(" ")[0],
+          scoreCp: cpMatch ? parseInt(cpMatch[1], 10) : null,
+          mate: mateMatch ? parseInt(mateMatch[1], 10) : null,
+        };
+      }
+    }
+
     for (let i = this._lineWaiters.length - 1; i >= 0; i--) {
       const waiter = this._lineWaiters[i];
       if (waiter.test(line)) {
@@ -76,6 +92,23 @@ export class Engine {
       to: uciMove.slice(2, 4),
       promotion: uciMove.length > 4 ? uciMove.slice(4, 5) : undefined,
     };
+  }
+
+  setMultiPv(n) {
+    this.worker.postMessage(`setoption name MultiPV value ${n}`);
+  }
+
+  async analyzeMultiPv(fen, movetimeMs) {
+    this._multiPvInfo = {};
+    this.worker.postMessage(`position fen ${fen}`);
+    const resultPromise = this._waitFor((line) => line.startsWith("bestmove"));
+    this.worker.postMessage(`go movetime ${movetimeMs}`);
+    await resultPromise;
+    const lines = Object.keys(this._multiPvInfo)
+      .map((key) => parseInt(key, 10))
+      .sort((a, b) => a - b)
+      .map((idx) => this._multiPvInfo[idx]);
+    return { lines };
   }
 
   terminate() {

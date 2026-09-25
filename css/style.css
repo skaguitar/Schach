@@ -431,6 +431,145 @@ main {
   flex-wrap: wrap;
 }
 
+/* --- Partie-Auswertung --- */
+
+.review-panel {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.review-progress {
+  font-style: italic;
+  color: #666;
+}
+
+.review-summary {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  background: var(--panel-bg);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.review-grade {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 68px;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: white;
+  flex-shrink: 0;
+}
+
+.review-grade-number {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.review-grade-label {
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.review-grade.grade-1 { background: #1f4d3d; }
+.review-grade.grade-2 { background: #3f7a4f; }
+.review-grade.grade-3 { background: #c68a3f; }
+.review-grade.grade-4 { background: #c9822f; }
+.review-grade.grade-5 { background: #c9682f; }
+.review-grade.grade-6 { background: #b3432b; }
+
+.review-stats {
+  flex: 1;
+}
+
+.review-stats p {
+  margin: 0 0 6px 0;
+}
+
+.review-note {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.review-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.review-count-pill {
+  font-size: 0.75rem;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: #eee;
+}
+
+.pill-best, .badge-best { background: #dff3e3; color: #1f4d3d; }
+.pill-good, .badge-good { background: #e8f3df; color: #3f7a4f; }
+.pill-inaccuracy, .badge-inaccuracy { background: #fbeed9; color: #8a5a1f; }
+.pill-mistake, .badge-mistake { background: #fbe1d2; color: #a1481f; }
+.pill-blunder, .badge-blunder { background: #f8d7d0; color: #8f2c17; }
+
+.review-move-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.review-move-row {
+  background: var(--panel-bg);
+  border-radius: 10px;
+  padding: 10px 12px;
+  border-left: 4px solid #ccc;
+}
+
+.review-move-row.cls-best { border-left-color: #1f4d3d; }
+.review-move-row.cls-good { border-left-color: #6fae5f; }
+.review-move-row.cls-inaccuracy { border-left-color: var(--accent); }
+.review-move-row.cls-mistake { border-left-color: #c9682f; }
+.review-move-row.cls-blunder { border-left-color: var(--danger); }
+
+.review-move-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.review-move-num {
+  color: #888;
+  font-family: "Courier New", monospace;
+}
+
+.review-move-san {
+  font-weight: 700;
+}
+
+.review-move-badge {
+  font-size: 0.7rem;
+  padding: 2px 9px;
+  border-radius: 20px;
+}
+
+.review-move-loss {
+  margin-left: auto;
+  font-family: "Courier New", monospace;
+  color: #888;
+}
+
+.review-move-detail {
+  margin: 6px 0 0 0;
+  font-size: 0.85rem;
+  color: #444;
+}
+
 @media (min-width: 700px) {
   .lesson-body {
     flex-direction: row;

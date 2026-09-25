@@ -2,6 +2,7 @@ import { Chess } from "../vendor/chess.esm.js";
 import { ChessBoard } from "./board.js";
 import { getLegalTargets, gameOutcome, outcomeText } from "./chess-utils.js";
 import { Engine, DIFFICULTIES } from "./engine.js";
+import { analyzeGame, renderReview } from "./review.js";
 
 export function mountSparring(root) {
   root.innerHTML = `
@@ -26,8 +27,10 @@ export function mountSparring(root) {
         <div class="move-history"></div>
         <div class="sparring-actions">
           <button class="btn undo-move">Zug zurücknehmen</button>
+          <button class="btn review-game" disabled>Partie auswerten</button>
           <button class="btn back-to-setup">Neues Spiel</button>
         </div>
+        <div class="review-panel hidden"></div>
       </div>
     </div>
   `;
@@ -42,6 +45,8 @@ export function mountSparring(root) {
   const historyEl = root.querySelector(".move-history");
   const undoBtn = root.querySelector(".undo-move");
   const backBtn = root.querySelector(".back-to-setup");
+  const reviewBtn = root.querySelector(".review-game");
+  const reviewPanel = root.querySelector(".review-panel");
 
   let selectedDifficulty = DIFFICULTIES[1];
   let selectedColor = "white";
@@ -92,6 +97,7 @@ export function mountSparring(root) {
       historyEl.appendChild(row);
     }
     historyEl.scrollTop = historyEl.scrollHeight;
+    reviewBtn.disabled = verboseHistory.length === 0;
   }
 
   function updateStatus() {
@@ -189,11 +195,47 @@ export function mountSparring(root) {
     board.setPosition(chess.fen());
     historyEl.innerHTML = "";
     newGameBtn.disabled = false;
+    reviewBtn.disabled = true;
+    reviewPanel.classList.add("hidden");
+    reviewPanel.innerHTML = "";
 
     await maybeEngineMove();
   }
 
   newGameBtn.addEventListener("click", startGame);
+
+  reviewBtn.addEventListener("click", async () => {
+    if (!chess) return;
+    const history = chess.history({ verbose: true });
+    if (!history.length) return;
+
+    reviewBtn.disabled = true;
+    undoBtn.disabled = true;
+    backBtn.disabled = true;
+    reviewPanel.classList.remove("hidden");
+    reviewPanel.innerHTML = `<p class="review-progress">Engine analysiert die Partie …</p>`;
+
+    const colorLabel = playerColor === "w" ? "Weiß" : "Schwarz";
+    try {
+      const review = await analyzeGame(history, playerColor, (done, total) => {
+        const progressEl = reviewPanel.querySelector(".review-progress");
+        if (progressEl) progressEl.textContent = `Engine analysiert die Partie … (${done}/${total})`;
+      });
+      renderReview(reviewPanel, review, colorLabel);
+      const closeBtn = document.createElement("button");
+      closeBtn.className = "btn review-close";
+      closeBtn.textContent = "Auswertung schließen";
+      closeBtn.addEventListener("click", () => reviewPanel.classList.add("hidden"));
+      reviewPanel.appendChild(closeBtn);
+    } catch (err) {
+      reviewPanel.innerHTML = `<p class="review-progress">Die Analyse ist fehlgeschlagen. Bitte erneut versuchen.</p>`;
+      console.error(err);
+    } finally {
+      reviewBtn.disabled = false;
+      undoBtn.disabled = false;
+      backBtn.disabled = false;
+    }
+  });
 
   backBtn.addEventListener("click", () => {
     gameEl.classList.add("hidden");
