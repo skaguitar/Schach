@@ -690,6 +690,28 @@ h4.review-move-list-heading {
 
 /* --- Coach --- */
 
+.coach-setup {
+  background: var(--panel-bg);
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.mode-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.engine-mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .coach-intro {
   background: var(--panel-bg);
   border-radius: 14px;

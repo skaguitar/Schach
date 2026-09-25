@@ -1,7 +1,7 @@
 import { Chess } from "../vendor/chess.esm.js";
 import { ChessBoard } from "./board.js";
 import { getLegalTargets, gameOutcome, outcomeText } from "./chess-utils.js";
-import { Engine } from "./engine.js";
+import { Engine, DIFFICULTIES } from "./engine.js";
 import { classifyLoss, scoreToCp, clampCp } from "./eval-utils.js";
 import { uciToSan, describeThreat, explainMove } from "./coaching-text.js";
 import { mountNotationLegend } from "./notation-legend.js";
@@ -12,6 +12,29 @@ const MOVETIME_THREAT = 400;
 
 export function mountCoach(root) {
   root.innerHTML = `
+    <div class="coach-setup">
+      <div class="setup-group">
+        <span class="setup-label">Spielmodus</span>
+        <div class="mode-buttons">
+          <button class="btn mode-choice active" data-mode="sandbox">Beide Seiten selbst spielen</button>
+          <button class="btn mode-choice" data-mode="engine">Gegen die Engine spielen</button>
+        </div>
+      </div>
+      <div class="engine-mode-options hidden">
+        <div class="setup-group">
+          <span class="setup-label">Deine Farbe</span>
+          <div class="color-buttons">
+            <button class="btn color-choice active" data-color="white">Weiß</button>
+            <button class="btn color-choice" data-color="black">Schwarz</button>
+          </div>
+        </div>
+        <div class="setup-group">
+          <span class="setup-label">Schwierigkeitsgrad der Engine</span>
+          <div class="difficulty-buttons"></div>
+        </div>
+      </div>
+      <button class="btn primary apply-setup">Übernehmen &amp; neu starten</button>
+    </div>
     <div class="coach-intro">
       <p>
         Wähle eine Figur. Ihre möglichen Züge werden nach Qualität eingefärbt.
@@ -37,6 +60,11 @@ export function mountCoach(root) {
     </div>
   `;
 
+  const modeButtons = root.querySelectorAll(".mode-choice");
+  const engineModeOptions = root.querySelector(".engine-mode-options");
+  const colorButtons = root.querySelectorAll(".color-choice");
+  const difficultyButtonsEl = root.querySelector(".difficulty-buttons");
+  const applySetupBtn = root.querySelector(".apply-setup");
   const boardSlot = root.querySelector(".coach-board-slot");
   const statusEl = root.querySelector(".coach-status");
   const undoBtn = root.querySelector(".undo-move");
@@ -46,28 +74,58 @@ export function mountCoach(root) {
   mountNotationLegend(notationLegendSlot);
 
   const chess = new Chess();
-  let engine = null;
-  let engineLoading = null;
+  let mode = "sandbox"; // "sandbox" | "engine"
+  let selectedColor = "white"; // Farbe des Menschen im Engine-Modus
+  let selectedDifficulty = DIFFICULTIES[1];
+
+  let analysisEngine = null;
+  let analysisEngineLoading = null;
+  let opponentEngine = null;
+  let opponentEngineLoading = null;
+
   let baselineCache = { fen: null, line: null, san: null };
   let lastAnalysisMap = new Map();
   let currentTooltip = null;
 
-  async function ensureEngine() {
-    if (engine && engine.ready) return engine;
-    if (!engineLoading) {
-      statusEl.textContent = "Engine wird geladen …";
-      engine = new Engine(new URL("../vendor/stockfish.js", import.meta.url));
-      engineLoading = engine.init().then(() => {
-        engine.setDifficulty({ skill: 20, elo: null });
+  DIFFICULTIES.forEach((diff) => {
+    const btn = document.createElement("button");
+    btn.className = "btn difficulty-choice" + (diff.id === selectedDifficulty.id ? " active" : "");
+    btn.textContent = diff.label;
+    btn.dataset.diffId = diff.id;
+    btn.addEventListener("click", () => {
+      selectedDifficulty = diff;
+      difficultyButtonsEl.querySelectorAll(".difficulty-choice").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+    });
+    difficultyButtonsEl.appendChild(btn);
+  });
+
+  async function ensureAnalysisEngine() {
+    if (analysisEngine && analysisEngine.ready) return analysisEngine;
+    if (!analysisEngineLoading) {
+      analysisEngine = new Engine(new URL("../vendor/stockfish.js", import.meta.url));
+      analysisEngineLoading = analysisEngine.init().then(() => {
+        analysisEngine.setDifficulty({ skill: 20, elo: null });
       });
     }
-    await engineLoading;
-    return engine;
+    await analysisEngineLoading;
+    return analysisEngine;
+  }
+
+  async function ensureOpponentEngine() {
+    if (opponentEngine && opponentEngine.ready) return opponentEngine;
+    if (!opponentEngineLoading) {
+      opponentEngine = new Engine(new URL("../vendor/stockfish.js", import.meta.url));
+      opponentEngineLoading = opponentEngine.init();
+    }
+    await opponentEngineLoading;
+    opponentEngine.setDifficulty(selectedDifficulty);
+    return opponentEngine;
   }
 
   async function ensureBaseline(fen) {
     if (baselineCache.fen === fen) return baselineCache;
-    const line = await engine.analyzeBest(fen, MOVETIME_BASELINE);
+    const line = await analysisEngine.analyzeBest(fen, MOVETIME_BASELINE);
     const san = line ? uciToSan(fen, line.uciMove) : null;
     baselineCache = { fen, line, san };
     return baselineCache;
@@ -98,6 +156,11 @@ export function mountCoach(root) {
     currentTooltip = tooltip;
   }
 
+  function isHumanTurn() {
+    if (mode === "sandbox") return true;
+    return chess.turn() === (selectedColor === "white" ? "w" : "b");
+  }
+
   function updateStatus() {
     const outcome = gameOutcome(chess);
     if (outcome.over) {
@@ -105,9 +168,42 @@ export function mountCoach(root) {
       board.setInteractive(false);
       return;
     }
+    if (mode === "engine" && !isHumanTurn()) {
+      statusEl.textContent = "Die Engine denkt nach …";
+      board.setInteractive(false);
+      return;
+    }
     board.setInteractive(true);
-    const mover = chess.turn() === "w" ? "Weiß" : "Schwarz";
-    statusEl.textContent = `${mover} ist am Zug. Wähle eine Figur, um die Zugqualität zu sehen.`;
+    if (mode === "engine") {
+      statusEl.textContent = "Du bist am Zug. Wähle eine Figur, um die Zugqualität zu sehen.";
+    } else {
+      const mover = chess.turn() === "w" ? "Weiß" : "Schwarz";
+      statusEl.textContent = `${mover} ist am Zug. Wähle eine Figur, um die Zugqualität zu sehen.`;
+    }
+  }
+
+  async function maybeEngineMove() {
+    if (mode !== "engine") return;
+    if (gameOutcome(chess).over) return;
+    if (isHumanTurn()) {
+      updateStatus();
+      return;
+    }
+
+    board.setInteractive(false);
+    statusEl.textContent = "Die Engine denkt nach …";
+    try {
+      await ensureOpponentEngine();
+      const move = await opponentEngine.getBestMove(chess.fen(), selectedDifficulty.movetime);
+      if (!move) return;
+      chess.move({ from: move.from, to: move.to, promotion: move.promotion });
+      board.setPosition(chess.fen(), { lastMove: { from: move.from, to: move.to } });
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = "Die Engine konnte keinen Zug finden.";
+      return;
+    }
+    updateStatus();
   }
 
   async function legalMovesProviderCoach(square) {
@@ -119,13 +215,13 @@ export function mountCoach(root) {
     statusEl.textContent = "Engine bewertet die Zugoptionen …";
 
     try {
-      await ensureEngine();
+      await ensureAnalysisEngine();
       const fen = chess.fen();
       const baseline = await ensureBaseline(fen);
       const evalBefore = clampCp(scoreToCp(baseline.line));
 
       const uciMoves = rawTargets.map((t) => t.from + t.to + (t.promotion ? "q" : ""));
-      const { lines } = await engine.analyzeMoves(fen, uciMoves, MOVETIME_CANDIDATES);
+      const { lines } = await analysisEngine.analyzeMoves(fen, uciMoves, MOVETIME_CANDIDATES);
 
       const results = rawTargets.map((t) => {
         const uci = t.from + t.to + (t.promotion ? "q" : "");
@@ -177,7 +273,7 @@ export function mountCoach(root) {
         const afterChess = new Chess(chess.fen());
         afterChess.move({ from: info.from, to: info.to, promotion: info.promotion ? "q" : undefined });
         const afterFen = afterChess.fen();
-        const reply = await engine.analyzeBest(afterFen, MOVETIME_THREAT);
+        const reply = await analysisEngine.analyzeBest(afterFen, MOVETIME_THREAT);
         if (reply && reply.mate > 0) {
           info.allowedMate = reply.mate;
         } else {
@@ -198,6 +294,7 @@ export function mountCoach(root) {
     lastAnalysisMap = new Map();
     board.setPosition(chess.fen(), { lastMove: { from, to } });
     updateStatus();
+    if (mode === "engine") maybeEngineMove();
   }
 
   const board = new ChessBoard(boardSlot, {
@@ -209,18 +306,44 @@ export function mountCoach(root) {
 
   boardSlot.addEventListener("pointerdown", () => hideTooltip());
 
-  newGameBtn.addEventListener("click", () => {
+  function restart() {
     chess.reset();
     hideTooltip();
     lastAnalysisMap = new Map();
     baselineCache = { fen: null, line: null, san: null };
+    board.setOrientation(mode === "engine" && selectedColor === "black" ? "black" : "white");
     board.setPosition(chess.fen());
     updateStatus();
+    if (mode === "engine") maybeEngineMove();
+  }
+
+  modeButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      mode = btn.dataset.mode;
+      modeButtons.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      engineModeOptions.classList.toggle("hidden", mode !== "engine");
+    });
   });
 
+  colorButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      selectedColor = btn.dataset.color;
+      colorButtons.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+    });
+  });
+
+  applySetupBtn.addEventListener("click", restart);
+  newGameBtn.addEventListener("click", restart);
+
   undoBtn.addEventListener("click", () => {
-    if (chess.history().length === 0) return;
+    const history = chess.history();
+    if (history.length === 0) return;
     chess.undo();
+    if (mode === "engine" && !isHumanTurn() && history.length > 1) {
+      chess.undo();
+    }
     hideTooltip();
     lastAnalysisMap = new Map();
     board.setPosition(chess.fen());
