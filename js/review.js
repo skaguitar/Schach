@@ -116,6 +116,10 @@ export async function analyzeGame(history, playerColor, onProgress) {
       wasBest: bestLine && bestLine.uciMove === entry.lan,
       bestMoveSan: bestLine ? uciToSan(entry.before, bestLine.uciMove) : null,
       alternatives: alternatives.slice(0, 2),
+      // Matt-Distanz, falls der Spieler hier selbst matt setzen konnte bzw.
+      // dem Gegner nach dem gespielten Zug ein erzwungenes Matt ermöglicht hat.
+      missedMateIn: bestLine && bestLine.mate > 0 ? bestLine.mate : null,
+      allowedMate: replyLine && replyLine.mate > 0 ? replyLine.mate : null,
     });
 
     totalLoss += cpLoss;
@@ -126,6 +130,103 @@ export async function analyzeGame(history, playerColor, onProgress) {
   const grade = gradeFromAcpl(acpl);
 
   return { moves, acpl, grade, countedMoves };
+}
+
+function moveLabel(move) {
+  return `${move.moveNumber}.${move.color === "b" ? ".." : ""} ${move.played}`;
+}
+
+function pawns(cpLoss) {
+  return (cpLoss / 100).toFixed(2);
+}
+
+function describeGoodMove(move) {
+  if (move.wasBest) {
+    return `<strong>${moveLabel(move)}</strong> war der Bestzug der Engine in dieser Stellung, genau richtig gespielt.`;
+  }
+  let sentence = `<strong>${moveLabel(move)}</strong> war eine sehr gute Wahl, nur ${pawns(move.cpLoss)} Bauerneinheiten hinter der theoretischen Bestvariante`;
+  sentence += move.bestMoveSan ? ` (${move.bestMoveSan}).` : ".";
+  return sentence;
+}
+
+function describeWeakMove(move) {
+  let sentence = `<strong>${moveLabel(move)}</strong> wurde von der Engine als <strong>${move.classification.label}</strong> eingestuft und hat dich ${pawns(move.cpLoss)} Bauerneinheiten gekostet.`;
+
+  if (move.allowedMate) {
+    sentence += ` Damit hast du dem Gegner ein erzwungenes Matt in ${move.allowedMate} Zügen ermöglicht.`;
+  }
+
+  if (move.bestMoveSan) {
+    sentence += ` Besser wäre <strong>${move.bestMoveSan}</strong> gewesen`;
+    if (move.missedMateIn) {
+      sentence += `, damit hättest du sogar selbst in ${move.missedMateIn} Zügen matt setzen können`;
+    }
+    sentence += ".";
+    const alt = move.alternatives.find((a) => a.san !== move.bestMoveSan);
+    if (alt) {
+      sentence += ` Auch <strong>${alt.san}</strong> wäre eine gute Alternative gewesen.`;
+    }
+  }
+
+  return sentence;
+}
+
+function describeNeutralMove(move) {
+  let sentence = `<strong>${moveLabel(move)}</strong>: ${move.classification.label} (${pawns(move.cpLoss)} Bauerneinheiten).`;
+  if (!move.wasBest && move.bestMoveSan) {
+    sentence += ` Besser wäre <strong>${move.bestMoveSan}</strong> gewesen.`;
+  }
+  return sentence;
+}
+
+export function buildDebrief(review, colorLabel) {
+  if (!review || review.countedMoves === 0) return [];
+
+  const paragraphs = [];
+  paragraphs.push(
+    `Als ${colorLabel} bekommst du für diese Partie die Schulnote <strong>${review.grade.grade} (${review.grade.label})</strong>, ` +
+      `bei einem durchschnittlichen Bewertungsverlust von ${pawns(review.acpl)} Bauerneinheiten pro Zug.`
+  );
+
+  if (review.moves.length < 4) {
+    paragraphs.push({ heading: "Kurze Rückschau", items: review.moves.map(describeNeutralMove) });
+    return paragraphs;
+  }
+
+  const byLossAsc = [...review.moves].sort((a, b) => a.cpLoss - b.cpLoss);
+  const best = byLossAsc.slice(0, 3);
+  const worst = byLossAsc.slice(-3).reverse();
+
+  paragraphs.push({ heading: "Deine drei besten Züge", items: best.map(describeGoodMove) });
+  paragraphs.push({ heading: "Deine drei schwächsten Züge", items: worst.map(describeWeakMove) });
+
+  return paragraphs;
+}
+
+export function renderDebrief(root, review, colorLabel) {
+  root.innerHTML = "";
+  const paragraphs = buildDebrief(review, colorLabel);
+  if (!paragraphs.length) {
+    root.innerHTML = "<p>Für diese Partie gibt es keine Nachbesprechung.</p>";
+    return;
+  }
+
+  const intro = document.createElement("p");
+  intro.className = "debrief-intro";
+  intro.innerHTML = paragraphs[0];
+  root.appendChild(intro);
+
+  for (const section of paragraphs.slice(1)) {
+    const heading = document.createElement("h4");
+    heading.textContent = section.heading;
+    root.appendChild(heading);
+    for (const text of section.items) {
+      const p = document.createElement("p");
+      p.className = "debrief-item";
+      p.innerHTML = text;
+      root.appendChild(p);
+    }
+  }
 }
 
 function summaryCounts(moves) {
@@ -165,6 +266,16 @@ export function renderReview(root, review, colorLabel) {
     </div>
   `;
   root.appendChild(summary);
+
+  const debriefEl = document.createElement("div");
+  debriefEl.className = "review-debrief";
+  renderDebrief(debriefEl, review, colorLabel);
+  root.appendChild(debriefEl);
+
+  const listHeading = document.createElement("h4");
+  listHeading.className = "review-move-list-heading";
+  listHeading.textContent = "Alle deine Züge im Detail";
+  root.appendChild(listHeading);
 
   const list = document.createElement("div");
   list.className = "review-move-list";

@@ -570,6 +570,36 @@ main {
   color: #444;
 }
 
+.review-debrief {
+  background: var(--panel-bg);
+  border-radius: 12px;
+  padding: 16px;
+  line-height: 1.5;
+}
+
+.review-debrief h4 {
+  margin: 16px 0 8px 0;
+  color: var(--forest);
+}
+
+.review-debrief h4:first-child {
+  margin-top: 0;
+}
+
+.debrief-intro {
+  margin: 0 0 4px 0;
+}
+
+.debrief-item {
+  margin: 0 0 10px 0;
+}
+
+.review-move-list-heading,
+h4.review-move-list-heading {
+  margin: 4px 0 0 0;
+  color: var(--forest);
+}
+
 @media (min-width: 700px) {
   .lesson-body {
     flex-direction: row;
