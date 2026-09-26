@@ -182,6 +182,19 @@ export function mountCoach(root) {
     }
   }
 
+  let noMovesMsgTimer = null;
+
+  function handleNoLegalMoves(square) {
+    const piece = chess.get(square);
+    const text =
+      piece && piece.color !== chess.turn()
+        ? "Diese Figur ist gerade nicht am Zug."
+        : "Diese Figur kann sich gerade nicht bewegen, zum Beispiel weil sie gebunden ist oder der König sonst im Schach stünde.";
+    statusEl.textContent = text;
+    clearTimeout(noMovesMsgTimer);
+    noMovesMsgTimer = setTimeout(updateStatus, 2800);
+  }
+
   async function maybeEngineMove() {
     if (mode !== "engine") return;
     if (gameOutcome(chess).over) return;
@@ -302,6 +315,7 @@ export function mountCoach(root) {
     onMove: handleMove,
     legalMovesProvider: legalMovesProviderCoach,
     onLongPress: handleLongPress,
+    onNoLegalMoves: handleNoLegalMoves,
   });
 
   boardSlot.addEventListener("pointerdown", () => hideTooltip());

@@ -117,6 +117,20 @@ export function mountSparring(root) {
     statusEl.textContent = text;
   }
 
+  let noMovesMsgTimer = null;
+
+  function handleNoLegalMoves(square) {
+    if (gameOver || engineThinking) return;
+    const piece = chess.get(square);
+    const text =
+      piece && piece.color !== chess.turn()
+        ? "Diese Figur ist gerade nicht am Zug."
+        : "Diese Figur kann sich gerade nicht bewegen, zum Beispiel weil sie gebunden ist oder dein König sonst im Schach stünde.";
+    statusEl.textContent = text;
+    clearTimeout(noMovesMsgTimer);
+    noMovesMsgTimer = setTimeout(updateStatus, 2800);
+  }
+
   function finishIfOver() {
     const outcome = gameOutcome(chess);
     if (outcome.over) {
@@ -191,6 +205,7 @@ export function mountSparring(root) {
         orientation: selectedColor,
         onMove: handlePlayerMove,
         legalMovesProvider: (square) => getLegalTargets(chess, square),
+        onNoLegalMoves: handleNoLegalMoves,
       });
     } else {
       board.setOrientation(selectedColor);

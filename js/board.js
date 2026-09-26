@@ -63,6 +63,7 @@ export class ChessBoard {
     this.onMove = options.onMove || null;
     this.legalMovesProvider = options.legalMovesProvider || null;
     this.onLongPress = options.onLongPress || null;
+    this.onNoLegalMoves = options.onNoLegalMoves || null;
     this.pieces = {};
     this.selected = null;
     this.legalTargets = [];
@@ -331,6 +332,7 @@ export class ChessBoard {
         if (token !== this._selectionToken) return;
         if (!moves || moves.length === 0) {
           this._clearSelection();
+          if (this.onNoLegalMoves) this.onNoLegalMoves(square);
         } else {
           this.legalTargets = moves;
         }
@@ -343,6 +345,7 @@ export class ChessBoard {
     if (moves.length === 0) {
       this._clearSelection();
       this._renderHighlights();
+      if (this.onNoLegalMoves) this.onNoLegalMoves(square);
       return;
     }
     this.selected = square;
