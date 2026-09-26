@@ -98,17 +98,23 @@ export class Engine {
     this.worker.postMessage(`setoption name MultiPV value ${n}`);
   }
 
-  async analyzeMultiPv(fen, movetimeMs) {
+  async _searchLines(fen, movetimeMs, searchmoves) {
     this._multiPvInfo = {};
     this.worker.postMessage(`position fen ${fen}`);
     const resultPromise = this._waitFor((line) => line.startsWith("bestmove"));
-    this.worker.postMessage(`go movetime ${movetimeMs}`);
+    const goCmd = searchmoves
+      ? `go movetime ${movetimeMs} searchmoves ${searchmoves.join(" ")}`
+      : `go movetime ${movetimeMs}`;
+    this.worker.postMessage(goCmd);
     await resultPromise;
-    const lines = Object.keys(this._multiPvInfo)
+    return Object.keys(this._multiPvInfo)
       .map((key) => parseInt(key, 10))
       .sort((a, b) => a - b)
       .map((idx) => this._multiPvInfo[idx]);
-    return { lines };
+  }
+
+  async analyzeMultiPv(fen, movetimeMs) {
+    return { lines: await this._searchLines(fen, movetimeMs) };
   }
 
   // Bewertet gezielt eine begrenzte Liste von Zügen (UCI-Notation, z. B.
@@ -118,16 +124,7 @@ export class Engine {
   async analyzeMoves(fen, uciMoves, movetimeMs) {
     if (!uciMoves.length) return { lines: [] };
     this.setMultiPv(uciMoves.length);
-    this._multiPvInfo = {};
-    this.worker.postMessage(`position fen ${fen}`);
-    const resultPromise = this._waitFor((line) => line.startsWith("bestmove"));
-    this.worker.postMessage(`go movetime ${movetimeMs} searchmoves ${uciMoves.join(" ")}`);
-    await resultPromise;
-    const lines = Object.keys(this._multiPvInfo)
-      .map((key) => parseInt(key, 10))
-      .sort((a, b) => a - b)
-      .map((idx) => this._multiPvInfo[idx]);
-    return { lines };
+    return { lines: await this._searchLines(fen, movetimeMs, uciMoves) };
   }
 
   // Liefert nur den besten Zug samt Bewertung der Gesamtstellung (MultiPV 1).

@@ -2,15 +2,20 @@ import { Chess } from "../vendor/chess.esm.js";
 import { ChessBoard } from "./board.js";
 import { getLegalTargets, gameOutcome, outcomeText } from "./chess-utils.js";
 import { Engine, DIFFICULTIES } from "./engine.js";
-import { analyzeGame, renderReview } from "./review.js";
 import { mountNotationLegend } from "./notation-legend.js";
+import { MILESTONES, loadProgress, isUnlocked, winsNeeded, recordResult } from "./progress.js";
 
 export function mountSparring(root) {
   root.innerHTML = `
     <div class="sparring-setup">
+      <div class="progress-panel">
+        <h3>Meilensteine</h3>
+        <div class="milestone-list"></div>
+      </div>
       <div class="setup-group">
         <span class="setup-label">Schwierigkeitsgrad</span>
         <div class="difficulty-buttons"></div>
+        <p class="difficulty-lock-hint"></p>
       </div>
       <div class="setup-group">
         <span class="setup-label">Deine Farbe</span>
@@ -29,17 +34,17 @@ export function mountSparring(root) {
         <div class="move-history"></div>
         <div class="sparring-actions">
           <button class="btn undo-move">Zug zurücknehmen</button>
-          <button class="btn review-game" disabled>Partie auswerten</button>
           <button class="btn back-to-setup">Neues Spiel</button>
         </div>
-        <div class="review-panel hidden"></div>
       </div>
     </div>
   `;
 
   const setupEl = root.querySelector(".sparring-setup");
   const gameEl = root.querySelector(".sparring-game");
+  const milestoneListEl = root.querySelector(".milestone-list");
   const difficultyButtonsEl = root.querySelector(".difficulty-buttons");
+  const lockHintEl = root.querySelector(".difficulty-lock-hint");
   const colorButtons = root.querySelectorAll(".color-choice");
   const newGameBtn = root.querySelector(".new-game");
   const boardSlot = root.querySelector(".sparring-board-slot");
@@ -47,13 +52,13 @@ export function mountSparring(root) {
   const historyEl = root.querySelector(".move-history");
   const undoBtn = root.querySelector(".undo-move");
   const backBtn = root.querySelector(".back-to-setup");
-  const reviewBtn = root.querySelector(".review-game");
-  const reviewPanel = root.querySelector(".review-panel");
   const notationLegendSlot = root.querySelector(".notation-legend-slot");
 
   mountNotationLegend(notationLegendSlot);
 
-  let selectedDifficulty = DIFFICULTIES[1];
+  const difficultyIds = DIFFICULTIES.map((d) => d.id);
+  let progress = loadProgress(difficultyIds);
+  let selectedDifficulty = DIFFICULTIES.find((d) => d.id === progress.unlocked[progress.unlocked.length - 1]) || DIFFICULTIES[0];
   let selectedColor = "white";
   let engine = null;
   let board = null;
@@ -62,17 +67,54 @@ export function mountSparring(root) {
   let gameOver = false;
   let engineThinking = false;
 
-  DIFFICULTIES.forEach((diff) => {
-    const btn = document.createElement("button");
-    btn.className = "btn difficulty-choice" + (diff.id === selectedDifficulty.id ? " active" : "");
-    btn.textContent = diff.label;
-    btn.addEventListener("click", () => {
-      selectedDifficulty = diff;
-      difficultyButtonsEl.querySelectorAll(".difficulty-choice").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
+  function renderMilestones() {
+    milestoneListEl.innerHTML = "";
+    for (const milestone of MILESTONES) {
+      const earned = Boolean(progress.milestones[milestone.id]);
+      const item = document.createElement("div");
+      item.className = "milestone-item" + (earned ? " earned" : "");
+      item.innerHTML = `
+        <span class="milestone-check"></span>
+        <span>
+          <span class="milestone-label">${milestone.label}${earned ? " (erreicht)" : ""}</span><br>
+          <span class="milestone-desc">${milestone.description}</span>
+        </span>
+      `;
+      milestoneListEl.appendChild(item);
+    }
+  }
+
+  function renderDifficultyButtons() {
+    difficultyButtonsEl.innerHTML = "";
+    DIFFICULTIES.forEach((diff) => {
+      const unlocked = isUnlocked(progress, diff.id);
+      const btn = document.createElement("button");
+      btn.className =
+        "btn difficulty-choice" + (diff.id === selectedDifficulty.id ? " active" : "") + (unlocked ? "" : " locked");
+      btn.textContent = unlocked ? diff.label : `${diff.label} (gesperrt)`;
+      btn.disabled = !unlocked;
+      if (unlocked) {
+        btn.addEventListener("click", () => {
+          selectedDifficulty = diff;
+          renderDifficultyButtons();
+        });
+      }
+      difficultyButtonsEl.appendChild(btn);
     });
-    difficultyButtonsEl.appendChild(btn);
-  });
+
+    const nextLockedIdx = DIFFICULTIES.findIndex((d) => !isUnlocked(progress, d.id));
+    if (nextLockedIdx > 0) {
+      const gate = DIFFICULTIES[nextLockedIdx - 1];
+      const target = DIFFICULTIES[nextLockedIdx];
+      const remaining = winsNeeded(progress, gate.id);
+      lockHintEl.textContent = `Noch ${remaining} Sieg${remaining === 1 ? "" : "e"} in Folge bei "${gate.label}", um "${target.label}" freizuschalten.`;
+    } else {
+      lockHintEl.textContent = "";
+    }
+  }
+
+  renderMilestones();
+  renderDifficultyButtons();
 
   colorButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -102,7 +144,6 @@ export function mountSparring(root) {
       historyEl.appendChild(row);
     }
     historyEl.scrollTop = historyEl.scrollHeight;
-    reviewBtn.disabled = verboseHistory.length === 0;
   }
 
   function updateStatus() {
@@ -133,13 +174,22 @@ export function mountSparring(root) {
 
   function finishIfOver() {
     const outcome = gameOutcome(chess);
-    if (outcome.over) {
-      gameOver = true;
-      board.setInteractive(false);
-      statusEl.textContent = outcomeText(outcome);
-      return true;
+    if (!outcome.over) return false;
+
+    gameOver = true;
+    board.setInteractive(false);
+
+    const result =
+      outcome.result === "draw" ? "draw" : outcome.result === (playerColor === "w" ? "white" : "black") ? "win" : "loss";
+    const newlyEarned = recordResult(progress, DIFFICULTIES, selectedDifficulty.id, result);
+
+    let text = outcomeText(outcome);
+    if (newlyEarned.length) {
+      const labels = newlyEarned.map((id) => MILESTONES.find((m) => m.id === id)?.label).filter(Boolean);
+      text += ` Neuer Meilenstein: ${labels.join(", ")}!`;
     }
-    return false;
+    statusEl.textContent = text;
+    return true;
   }
 
   async function maybeEngineMove() {
@@ -215,51 +265,17 @@ export function mountSparring(root) {
     board.setPosition(chess.fen());
     historyEl.innerHTML = "";
     newGameBtn.disabled = false;
-    reviewBtn.disabled = true;
-    reviewPanel.classList.add("hidden");
-    reviewPanel.innerHTML = "";
 
     await maybeEngineMove();
   }
 
   newGameBtn.addEventListener("click", startGame);
 
-  reviewBtn.addEventListener("click", async () => {
-    if (!chess) return;
-    const history = chess.history({ verbose: true });
-    if (!history.length) return;
-
-    reviewBtn.disabled = true;
-    undoBtn.disabled = true;
-    backBtn.disabled = true;
-    reviewPanel.classList.remove("hidden");
-    reviewPanel.innerHTML = `<p class="review-progress">Engine analysiert die Partie …</p>`;
-
-    const colorLabel = playerColor === "w" ? "Weiß" : "Schwarz";
-    try {
-      const review = await analyzeGame(history, playerColor, (done, total) => {
-        const progressEl = reviewPanel.querySelector(".review-progress");
-        if (progressEl) progressEl.textContent = `Engine analysiert die Partie … (${done}/${total})`;
-      });
-      renderReview(reviewPanel, review, colorLabel);
-      const closeBtn = document.createElement("button");
-      closeBtn.className = "btn review-close";
-      closeBtn.textContent = "Auswertung schließen";
-      closeBtn.addEventListener("click", () => reviewPanel.classList.add("hidden"));
-      reviewPanel.appendChild(closeBtn);
-    } catch (err) {
-      reviewPanel.innerHTML = `<p class="review-progress">Die Analyse ist fehlgeschlagen. Bitte erneut versuchen.</p>`;
-      console.error(err);
-    } finally {
-      reviewBtn.disabled = false;
-      undoBtn.disabled = false;
-      backBtn.disabled = false;
-    }
-  });
-
   backBtn.addEventListener("click", () => {
     gameEl.classList.add("hidden");
     setupEl.classList.remove("hidden");
+    renderMilestones();
+    renderDifficultyButtons();
   });
 
   undoBtn.addEventListener("click", () => {

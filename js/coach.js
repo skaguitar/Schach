@@ -42,11 +42,11 @@ export function mountCoach(root) {
         dieser Zug gerade gut oder schlecht wäre.
       </p>
       <div class="coach-quality-legend">
-        <span class="review-count-pill pill-best">Bestzug</span>
-        <span class="review-count-pill pill-good">Gut</span>
-        <span class="review-count-pill pill-inaccuracy">Ungenauigkeit</span>
-        <span class="review-count-pill pill-mistake">Fehler</span>
-        <span class="review-count-pill pill-blunder">Patzer</span>
+        <span class="quality-pill pill-best">Bestzug</span>
+        <span class="quality-pill pill-good">Gut</span>
+        <span class="quality-pill pill-inaccuracy">Ungenauigkeit</span>
+        <span class="quality-pill pill-mistake">Fehler</span>
+        <span class="quality-pill pill-blunder">Patzer</span>
       </div>
       <div class="notation-legend-slot"></div>
     </div>
@@ -233,11 +233,11 @@ export function mountCoach(root) {
       const baseline = await ensureBaseline(fen);
       const evalBefore = clampCp(scoreToCp(baseline.line));
 
-      const uciMoves = rawTargets.map((t) => t.from + t.to + (t.promotion ? "q" : ""));
-      const { lines } = await analysisEngine.analyzeMoves(fen, uciMoves, MOVETIME_CANDIDATES);
+      const targets = rawTargets.map((t) => ({ ...t, uci: t.from + t.to + (t.promotion ? "q" : "") }));
+      const { lines } = await analysisEngine.analyzeMoves(fen, targets.map((t) => t.uci), MOVETIME_CANDIDATES);
 
-      const results = rawTargets.map((t) => {
-        const uci = t.from + t.to + (t.promotion ? "q" : "");
+      const results = targets.map((t) => {
+        const uci = t.uci;
         const line = lines.find((l) => l.uciMove === uci) || null;
         const evalAfter = clampCp(scoreToCp(line));
         const cpLoss = Math.max(0, Math.round(evalBefore - evalAfter));

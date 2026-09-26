@@ -9,39 +9,32 @@ const PIECE_ACC = {
   k: "deinen König",
 };
 
-export function uciToSan(fen, uciMove) {
-  if (!uciMove) return null;
+function applyUciMove(fen, uciMove) {
   try {
     const chess = new Chess(fen);
-    const move = chess.move({
+    return chess.move({
       from: uciMove.slice(0, 2),
       to: uciMove.slice(2, 4),
       promotion: uciMove.length > 4 ? uciMove.slice(4, 5) : undefined,
     });
-    return move ? move.san : null;
   } catch {
     return null;
   }
+}
+
+export function uciToSan(fen, uciMove) {
+  if (!uciMove) return null;
+  const move = applyUciMove(fen, uciMove);
+  return move ? move.san : null;
 }
 
 // Prüft, ob die vom Gegner nach dem gespielten Zug beste Antwort eine
 // Figur schlägt – einfache Annäherung an "diese Figur hängt jetzt".
 export function describeThreat(afterFen, replyUciMove) {
   if (!replyUciMove) return null;
-  try {
-    const chess = new Chess(afterFen);
-    const move = chess.move({
-      from: replyUciMove.slice(0, 2),
-      to: replyUciMove.slice(2, 4),
-      promotion: replyUciMove.length > 4 ? replyUciMove.slice(4, 5) : undefined,
-    });
-    if (move && move.captured) {
-      return { pieceAcc: PIECE_ACC[move.captured] || "eine Figur", square: move.to };
-    }
-  } catch {
-    /* Zug ließ sich nicht nachbilden – dann einfach keine Detail-Drohung nennen */
-  }
-  return null;
+  const move = applyUciMove(afterFen, replyUciMove);
+  if (!move || !move.captured) return null;
+  return { pieceAcc: PIECE_ACC[move.captured] || "eine Figur", square: move.to };
 }
 
 /**

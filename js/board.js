@@ -218,14 +218,18 @@ export class ChessBoard {
     }
   }
 
+  // Skalierung zwischen SVG-viewBox-Einheiten und tatsächlichen Bildschirm-Pixeln.
+  _getScreenScale() {
+    const rect = this.svg.getBoundingClientRect();
+    return { rect, scaleX: rect.width / BOARD_PX, scaleY: rect.height / BOARD_PX };
+  }
+
   // Pixel-Rechteck eines Feldes relativ zum wrapper-Element, z. B. um dort
   // ein HTML-Overlay (Tooltip, Popup) exakt zu positionieren.
   getSquareScreenRect(square) {
     const { x, y } = squareToCoords(square, this.orientation);
-    const rect = this.svg.getBoundingClientRect();
+    const { rect, scaleX, scaleY } = this._getScreenScale();
     const wrapperRect = this.wrapper.getBoundingClientRect();
-    const scaleX = rect.width / BOARD_PX;
-    const scaleY = rect.height / BOARD_PX;
     return {
       left: rect.left - wrapperRect.left + x * scaleX,
       top: rect.top - wrapperRect.top + y * scaleY,
@@ -367,9 +371,7 @@ export class ChessBoard {
   _showPromotionPicker(target) {
     const isWhite = this.pieces[target.from] === this.pieces[target.from].toUpperCase();
     const { x, y } = squareToCoords(target.to, this.orientation);
-    const rect = this.svg.getBoundingClientRect();
-    const scaleX = rect.width / BOARD_PX;
-    const scaleY = rect.height / BOARD_PX;
+    const { scaleX, scaleY } = this._getScreenScale();
 
     this.promoBox.innerHTML = "";
     this.promoBox.classList.remove("hidden");
